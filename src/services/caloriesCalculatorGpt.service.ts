@@ -1,9 +1,9 @@
-import { ICalculator, IPrompterCalculator } from './types'
 import puppeteer from 'puppeteer-extra'
 import StealthPlugin from 'puppeteer-extra-plugin-stealth'
 import * as fs from 'fs'
 
 import { Page } from 'puppeteer'
+import { Calculator } from './types'
 puppeteer.use(StealthPlugin())
 
 const loginToProvider = async (
@@ -35,15 +35,15 @@ const loginToProvider = async (
   await puppeteerPage.click('button[id="declineButton"]')
 }
 
-async function puppeteerScript(
-  email: string,
-  password: string,
-  imagePath: string,
-  prompt: string
-) {
-  if (!imagePath) throw new Error('No image path found')
+async function puppeteerScript(imageURL: string) {
+  const email = process.env.EMAIL_SECRET as string
+  const password = process.env.PASSWORD_SECRET as string
+  const prompt =
+    'How much calories are in the food inside this image? Criteria: Consider number of elements in the image, color, and size of the elements. Reply only with the total calories calculated in numbers & do not suggest more than one response.'
+
+  if (!imageURL) throw new Error('No image path found')
   let response: string | null = null
-  const imageBuffer = fs.readFileSync(imagePath)
+  const imageBuffer = fs.readFileSync(imageURL)
   const imageUint8Array = new Uint8Array(imageBuffer)
 
   const browser = await puppeteer.launch({ headless: false })
@@ -90,7 +90,7 @@ async function puppeteerScript(
   const inputUploadHandle = await page.$('input[class="hidden"]')
   if (!inputUploadHandle) throw new Error('File input element not found')
 
-  await inputUploadHandle.uploadFile(imagePath)
+  await inputUploadHandle.uploadFile(imageURL)
 
   await page.waitForSelector(
     'button[class="absolute right-1 top-1 -translate-y-1/2 translate-x-1/2 rounded-full transition-colors border-[3px] border-[#f4f4f4] bg-black p-[2px] text-white dark:border-token-main-surface-secondary dark:bg-white dark:text-black"]',
@@ -100,7 +100,15 @@ async function puppeteerScript(
   await page.waitForSelector('button[data-testid="send-button"]', {
     visible: true
   })
-  await page.click('button[data-testid="send-button"]')
+  await page.evaluate(() => {
+    setTimeout(() => {
+      const sendButton = document.querySelector(
+        'button[data-testid="send-button"]'
+      ) as HTMLButtonElement
+      if (!sendButton) throw new Error('Send button not found')
+      sendButton.click()
+    }, 500)
+  })
 
   await page.waitForSelector('div[data-message-author-role="assistant"]', {
     visible: true
@@ -132,19 +140,9 @@ async function puppeteerScript(
   return Number(response)
 }
 
-export class CaloriesClaculatorGPT implements IPrompterCalculator {
-  public readonly calculateCalories = async (
-    email: string,
-    password: string,
-    prompt: string,
-    image: string
-  ) => {
-    const puppeteerResponse = await puppeteerScript(
-      email,
-      password,
-      image,
-      prompt
-    )
+export class CaloriesClaculatorGPT implements Calculator {
+  public readonly calculateCalories = async (imageURL: string) => {
+    const puppeteerResponse = await puppeteerScript(imageURL)
     return puppeteerResponse
   }
 }

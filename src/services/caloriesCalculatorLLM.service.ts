@@ -1,7 +1,7 @@
 import { ICalculator } from './types'
 
 export class CaloriesClaculatorLLM implements ICalculator {
-  public readonly calculateCalories = (image: string) => {
+  public readonly calculateCalories = async (imageURL: string) => {
     // Mocked response
 
     const llm = () => {}
