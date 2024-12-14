@@ -43,8 +43,6 @@ async function puppeteerScript(imageURL: string) {
 
   if (!imageURL) throw new Error('No image path found')
   let response: string | null = null
-  const imageBuffer = fs.readFileSync(imageURL)
-  const imageUint8Array = new Uint8Array(imageBuffer)
 
   const browser = await puppeteer.launch({ headless: false })
   const page = await browser.newPage()
@@ -90,9 +88,11 @@ async function puppeteerScript(imageURL: string) {
   const inputUploadHandle = await page.$('input[class="hidden"]')
   if (!inputUploadHandle) throw new Error('File input element not found')
 
+  await page.setRequestInterception(true)
+
   await inputUploadHandle.uploadFile(imageURL)
 
-  await page.waitForSelector(
+  await await page.waitForSelector(
     'button[class="absolute right-1 top-1 -translate-y-1/2 translate-x-1/2 rounded-full transition-colors border-[3px] border-[#f4f4f4] bg-black p-[2px] text-white dark:border-token-main-surface-secondary dark:bg-white dark:text-black"]',
     { visible: true }
   )
@@ -110,9 +110,6 @@ async function puppeteerScript(imageURL: string) {
     }, 500)
   })
 
-  await page.waitForSelector('div[data-message-author-role="assistant"]', {
-    visible: true
-  })
   await page.waitForSelector('button[data-testid="send-button"]', {
     visible: true
   })
@@ -146,3 +143,4 @@ export class CaloriesClaculatorGPT implements Calculator {
     return puppeteerResponse
   }
 }
+
