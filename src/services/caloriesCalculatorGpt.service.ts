@@ -1,39 +1,9 @@
 import puppeteer from 'puppeteer-extra'
 import StealthPlugin from 'puppeteer-extra-plugin-stealth'
-import * as fs from 'fs'
+import { loginToProvider } from './util/loginToProvider'
 
-import { Page } from 'puppeteer'
 import { Calculator } from './types'
 puppeteer.use(StealthPlugin())
-
-const loginToProvider = async (
-  email: string,
-  password: string,
-  puppeteerPage: Page
-) => {
-  await puppeteerPage.waitForSelector(
-    'input[type="email"], input[type="password"]',
-    {
-      visible: true
-    }
-  )
-
-  // Enter email address
-  await puppeteerPage.type('input[type="email"]', email)
-  await puppeteerPage.keyboard.press('Enter')
-
-  // Wait for password input
-  await puppeteerPage.waitForSelector('input[type="password"]', {
-    visible: true
-  })
-  await puppeteerPage.type('input[type="password"]', password)
-  await puppeteerPage.keyboard.press('Enter')
-
-  await puppeteerPage.waitForNavigation({
-    waitUntil: 'networkidle0'
-  })
-  await puppeteerPage.click('button[id="declineButton"]')
-}
 
 async function puppeteerScript(imageURL: string) {
   const email = process.env.EMAIL_SECRET as string
@@ -88,31 +58,48 @@ async function puppeteerScript(imageURL: string) {
   const inputUploadHandle = await page.$('input[class="hidden"]')
   if (!inputUploadHandle) throw new Error('File input element not found')
 
-  await page.setRequestInterception(true)
-
   await inputUploadHandle.uploadFile(imageURL)
 
-  await await page.waitForSelector(
-    'button[class="absolute right-1 top-1 -translate-y-1/2 translate-x-1/2 rounded-full transition-colors border-[3px] border-[#f4f4f4] bg-black p-[2px] text-white dark:border-token-main-surface-secondary dark:bg-white dark:text-black"]',
-    { visible: true }
+  await page.evaluate(async () => {
+    const asyncWait = (ms: number) =>
+      new Promise((resolve) => setTimeout(resolve, ms))
+    const keepCheckingUploadingCircles = async (
+      circlesNumber: number,
+      milliseconds: number,
+      maxAttempts?: number // Optional parameter
+    ) => {
+      if (maxAttempts !== undefined && maxAttempts <= 0) {
+        console.log('Max attempts reached. Stopping recursion.')
+        return
+      }
+
+      if (circlesNumber > 2) {
+        console.log('valueToCheck is falsy.')
+        await asyncWait(2000)
+        await keepCheckingUploadingCircles(
+          circlesNumber,
+          milliseconds,
+          maxAttempts ? maxAttempts - 1 : undefined
+        )
+      } else {
+        console.log('valueToCheck is truthy.')
+        return
+      }
+    }
+
+    let circles = document.querySelectorAll('circle')
+    await keepCheckingUploadingCircles(circles.length, 2000)
+  })
+
+  const sendButton = await page.waitForSelector(
+    'button[data-testid="send-button"]',
+    {
+      visible: true
+    }
   )
 
-  await page.waitForSelector('button[data-testid="send-button"]', {
-    visible: true
-  })
-  await page.evaluate(() => {
-    setTimeout(() => {
-      const sendButton = document.querySelector(
-        'button[data-testid="send-button"]'
-      ) as HTMLButtonElement
-      if (!sendButton) throw new Error('Send button not found')
-      sendButton.click()
-    }, 500)
-  })
-
-  await page.waitForSelector('button[data-testid="send-button"]', {
-    visible: true
-  })
+  if (!sendButton) throw new Error('Send button not found')
+  sendButton.click()
 
   response = await page.evaluate(() => {
     const divMessage = document.querySelector(
@@ -143,4 +130,3 @@ export class CaloriesClaculatorGPT implements Calculator {
     return puppeteerResponse
   }
 }
-
