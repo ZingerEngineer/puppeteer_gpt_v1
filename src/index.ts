@@ -7,18 +7,21 @@ import { CaloriesClaculatorLLM } from './services/caloriesCalculatorLLM.service'
 dotenv.config()
 
 const imagePath = path.resolve(__dirname, '../images')
-const calculator = process.env.CALCULATOR_SECRET
+const calculationMethod = process.env.CURRENT_CALCULATOR_SECRET
 
 // Usage
 ;(async () => {
   const imageURL = `${imagePath}/bananas.jpg`
   try {
-    const caloriesCalculator = new CaloriesClaculator(CaloriesClaculatorGPT)
+    if (calculationMethod === 'GPT') {
+      const caloriesCalculator = new CaloriesClaculator(CaloriesClaculatorGPT)
+      const calories = await caloriesCalculator.calculateCalories(imageURL)
+      console.log('Calories:', calories)
+    }
+    const caloriesCalculator = new CaloriesClaculator(CaloriesClaculatorLLM)
     const calories = await caloriesCalculator.calculateCalories(imageURL)
-
     console.log('Calories:', calories)
   } catch (error) {
     console.error('Error:', error)
   }
 })()
-
